@@ -279,48 +279,124 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
     }
     cout << endl;
     
-    // 直接驗證正確答案組合：-1-1, -0-0, 1--1, --11
-    vector<string> correctAnswer = {"-1-1", "-0-0", "1--1", "--11"};
-    vector<Minterm> solution;
+    // 找出必要的 prime implicants (essential prime implicants)
+    vector<Minterm> essentialPIs;
+    set<int> coveredMinterms;
     
-    cout << "Checking correct answer combination:" << endl;
-    for (const string& correctTerm : correctAnswer) {
+    for (int minterm : requiredMinterms) {
+        vector<const Minterm*> coveringPIs;
+        
+        // 找到所有能覆蓋此 minterm 的 prime implicants
         for (const auto& pi : primeImplicants) {
-            if (pi.term == correctTerm) {
-                solution.push_back(pi);
-                cout << "  " << pi.term << " covers: ";
-                for (int m : pi.minterms) {
-                    cout << m << " ";
+            if (covers(pi, minterm)) {
+                coveringPIs.push_back(&pi);
+            }
+        }
+        
+        // 如果只有一個 PI 能覆蓋此 minterm，它就是必要的
+        if (coveringPIs.size() == 1) {
+            const Minterm* essentialPI = coveringPIs[0];
+            
+            // 檢查是否已經加入
+            bool alreadyAdded = false;
+            for (const auto& epi : essentialPIs) {
+                if (epi.term == essentialPI->term) {
+                    alreadyAdded = true;
+                    break;
                 }
-                cout << endl;
-                break;
+            }
+            
+            if (!alreadyAdded) {
+                essentialPIs.push_back(*essentialPI);
+                cout << "Essential PI found: " << essentialPI->term << endl;
+                
+                // 標記所有被此 PI 覆蓋的 minterms
+                for (int m : essentialPI->minterms) {
+                    if (requiredMinterms.find(m) != requiredMinterms.end()) {
+                        coveredMinterms.insert(m);
+                    }
+                }
             }
         }
     }
     
-    // 驗證覆蓋是否完整
-    set<int> totalCovered;
-    for (const auto& pi : solution) {
-        for (int m : pi.minterms) {
-            if (requiredMinterms.find(m) != requiredMinterms.end()) {
-                totalCovered.insert(m);
-            }
+    // 找出剩餘未覆蓋的 minterms
+    set<int> remainingMinterms;
+    for (int m : requiredMinterms) {
+        if (coveredMinterms.find(m) == coveredMinterms.end()) {
+            remainingMinterms.insert(m);
         }
     }
     
-    cout << "Total covered by correct answer: ";
-    for (int m : totalCovered) {
+    cout << "Remaining minterms after essential PIs: ";
+    for (int m : remainingMinterms) {
         cout << m << " ";
     }
     cout << endl;
     
-    cout << "Missing minterms: ";
-    for (int m : requiredMinterms) {
-        if (totalCovered.find(m) == totalCovered.end()) {
-            cout << m << " ";
+    // 使用改進的貪心演算法選擇剩餘的 PIs
+    vector<Minterm> solution = essentialPIs;
+    
+    while (!remainingMinterms.empty()) {
+        const Minterm* bestPI = nullptr;
+        double bestScore = -1;
+        int maxCoverage = 0;
+        
+        // 找到最佳的 PI
+        for (const auto& pi : primeImplicants) {
+            // 檢查是否已經在解決方案中
+            bool alreadySelected = false;
+            for (const auto& selectedPI : solution) {
+                if (selectedPI.term == pi.term) {
+                    alreadySelected = true;
+                    break;
+                }
+            }
+            if (alreadySelected) continue;
+            
+            int coverage = 0;
+            for (int m : remainingMinterms) {
+                if (covers(pi, m)) {
+                    coverage++;
+                }
+            }
+            
+            if (coverage > 0) {
+                int literals = numVars - pi.countDashes();
+                double score = (double)coverage / literals; // 覆蓋數量除以 literal 數量
+                
+                // 優先選擇覆蓋更多 minterms 的，然後考慮效率，最後考慮字典序
+                if (coverage > maxCoverage || 
+                    (coverage == maxCoverage && score > bestScore) ||
+                    (coverage == maxCoverage && score == bestScore && 
+                     (bestPI == nullptr || pi.term < bestPI->term))) {
+                    maxCoverage = coverage;
+                    bestScore = score;
+                    bestPI = &pi;
+                }
+            }
+        }
+        
+        if (bestPI) {
+            solution.push_back(*bestPI);
+            cout << "Selected PI: " << bestPI->term << " (covers " << maxCoverage 
+                 << " remaining minterms, " << (numVars - bestPI->countDashes()) 
+                 << " literals)" << endl;
+            
+            // 移除被覆蓋的 minterms
+            for (int m : bestPI->minterms) {
+                remainingMinterms.erase(m);
+            }
+        } else {
+            cout << "Warning: Cannot find PI to cover remaining minterms!" << endl;
+            break; // 無法找到更多覆蓋
         }
     }
-    cout << endl;
+    
+    cout << "Final solution with " << solution.size() << " terms:" << endl;
+    for (const auto& pi : solution) {
+        cout << "  " << pi.term << endl;
+    }
     
     return solution;
 }
@@ -338,17 +414,9 @@ void BooleanMinimizer::writePLA(const string& filename, const vector<Minterm>& s
     file << ".ob f" << endl;
     file << ".p " << solution.size() << endl;
     
-    // 創建排序後的解決方案副本，按照正確答案的順序排列
+    // 簡單按字典序排序
     vector<Minterm> sortedSolution = solution;
     sort(sortedSolution.begin(), sortedSolution.end(), [](const Minterm& a, const Minterm& b) {
-        // 正確順序: -1-1, -0-0, 1--1, --11
-        map<string, int> order = {{"-1-1", 0}, {"-0-0", 1}, {"1--1", 2}, {"--11", 3}};
-        
-        if (order.find(a.term) != order.end() && order.find(b.term) != order.end()) {
-            return order[a.term] < order[b.term];
-        }
-        
-        // 默認按字典序排序
         return a.term < b.term;
     });
     
