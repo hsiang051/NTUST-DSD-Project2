@@ -26,14 +26,14 @@ struct Minterm {
 class BooleanMinimizer {
 private:
     int numVars;
-    std::vector<std::string> inputLabels;
-    std::string outputLabel;
+    std::vector<std::string> input_variables;
+    std::string output_variables;
     std::vector<std::string> minterms;
     std::vector<std::string> dontCares;
     std::vector<Minterm> primeImplicants;
     
 public:
-    void readPLA(const std::string& filename);
+    bool readPLA(const std::string& filename);
     std::vector<int> expandTerm(const std::string& term);
     bool canCombine(const std::string& a, const std::string& b, int& diffPos);
     void quineMcCluskey();

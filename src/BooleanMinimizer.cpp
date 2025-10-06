@@ -18,63 +18,93 @@ int Minterm::countDashes() const {
     return count;
 }
 
-void BooleanMinimizer::readPLA(const string& filename) {
-    ifstream file(filename);
+std::string trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+bool BooleanMinimizer::readPLA(const std::string& filename) {
+    std::ifstream file(filename);
     if (!file.is_open()) {
-        cerr << "Error: Cannot open file " << filename << endl;
-        exit(1);
+        std::cerr << "Error: Cannot open file " << filename << std::endl;
+        return false;
     }
     
-    string line;
-    while (getline(file, line)) {
-        if (line.empty()) continue;
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        line = trim(line);
         
-        if (line[0] == '.') {
-            if (line.substr(0, 2) == ".i" && line[2] == ' ') {
-                string numStr = line.substr(2);
-                // 移除前導空格
-                size_t start = numStr.find_first_not_of(" \t");
-                if (start != string::npos) {
-                    numStr = numStr.substr(start);
-                }
-                try {
-                    numVars = stoi(numStr);
-                } catch (const std::invalid_argument& e) {
-                    cerr << "Error parsing number of variables from: '" << numStr << "'" << endl;
-                    exit(1);
-                }
-            } else if (line.substr(0, 4) == ".ilb") {
-                istringstream iss(line.substr(5));
-                string label;
-                while (iss >> label) {
-                    inputLabels.push_back(label);
-                }
-            } else if (line.substr(0, 3) == ".ob") {
-                string obStr = line.substr(3);
-                // 移除前導空格
-                size_t start = obStr.find_first_not_of(" \t");
-                if (start != string::npos) {
-                    outputLabel = obStr.substr(start);
-                }
-            } else if (line.substr(0, 2) == ".e") {
-                break;
+        // 跳過空行和註解
+        if (line.empty() || line[0] == '#') continue;
+        
+        // .i 輸入變數數量
+        if (line.find(".i ") == 0) {
+            std::string num_str = trim(line.substr(3));
+            try {
+                numVars = std::stoi(num_str);
+            } catch (const std::exception& e) {
+                std::cerr << "Error parsing number of variables: " << num_str << std::endl;
+                return false;
             }
-        } else {
-            // 處理 product term
-            size_t spacePos = line.find(' ');
-            if (spacePos != string::npos) {
-                string term = line.substr(0, spacePos);
-                string output = line.substr(spacePos + 1);
-                
-                if (output == "1") {
-                    minterms.push_back(term);
-                } else if (output == "-") {
-                    dontCares.push_back(term);
-                }
+            continue;
+        }
+        
+        // .o 輸出變數數量
+        if (line.find(".o ") == 0) {
+            std::string num_str = trim(line.substr(3));
+            continue;
+        }
+        
+        // .ilb 輸入變數名稱
+        if (line.find(".ilb ") == 0) {
+            std::string vars = line.substr(5);
+            std::istringstream iss(vars);
+            std::string var;
+            input_variables.clear();
+            while (iss >> var) {
+                input_variables.push_back(var);
+            }
+            continue;
+        }
+        
+        // .ob 輸出變數名稱
+        if (line.find(".ob ") == 0) {
+            std::string output_name = trim(line.substr(4));
+            output_variables = output_name;
+            continue;
+        }
+        
+        // .p Product Terms 數量
+        if (line.find(".p ") == 0) {
+            std::string num_str = trim(line.substr(3));
+            continue;
+        }
+        
+        // .e 結束
+        if (line == ".e") { 
+            break;
+        }
+        
+        // 處理 Product Terms
+        size_t space_pos = line.find(' ');
+        if (space_pos != std::string::npos) {
+            std::string input_part = trim(line.substr(0, space_pos));
+            std::string output_part = trim(line.substr(space_pos + 1));
+            
+            // 只保留輸出為1的
+            if (output_part == "1"){ 
+                minterms.push_back(input_part);
+            } else if (output_part == "-"){ 
+                dontCares.push_back(input_part);
             }
         }
     }
+
     file.close();
+    return true;
 }
 
 vector<int> BooleanMinimizer::expandTerm(const string& term) {
@@ -253,7 +283,7 @@ void BooleanMinimizer::writePLA(const string& filename, const vector<Minterm>& s
     file << ".i " << numVars << endl;
     file << ".o 1" << endl;
     file << ".ilb";
-    for (const string& label : inputLabels) {
+    for (const string& label : input_variables) {
         file << " " << label;
     }
     file << endl;
@@ -283,7 +313,11 @@ void BooleanMinimizer::writePLA(const string& filename, const vector<Minterm>& s
 }
 
 void BooleanMinimizer::minimize(const string& inputFile, const string& outputFile) {
-    readPLA(inputFile);
+    if (!readPLA(inputFile)) {      
+        std::cerr << "Failed to read PLA file: " << inputFile << std::endl;
+        return;
+    }
+    
     quineMcCluskey();
     vector<Minterm> solution = petrickMethod();
     writePLA(outputFile, solution);
