@@ -31,5 +31,5 @@
 .DS_Store
 
 # OutputFiles
-*.dot
-*.png
+output*.pla
+output.pla
