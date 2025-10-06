@@ -18,11 +18,13 @@ file(GLOB SOURCES
     ${PROJECT_SOURCE_DIR}/src/*.cpp
 )
 
-file(GLOB MAIN_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/*.cpp
+# 收集主程序源文件（排除測試文件）
+set(MAIN_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/main.cpp
+    ${PROJECT_SOURCE_DIR}/src/BooleanMinimizer.cpp
 )
-list(REMOVE_ITEM MAIN_SOURCES ${PROJECT_SOURCE_DIR}/src/test.cpp)
-add_executable(robdd ${MAIN_SOURCES})
+
+add_executable(main ${MAIN_SOURCES})
 
 # 生成 test 執行檔
 add_executable(test ${PROJECT_SOURCE_DIR}/src/test.cpp)
