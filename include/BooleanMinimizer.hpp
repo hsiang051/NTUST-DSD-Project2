@@ -13,8 +13,8 @@
 #include <climits>
 
 struct Minterm {
-    std::string term;      // 例如: "10-1"
-    std::set<int> minterms; // 原始 minterm 編號
+    std::string term;
+    std::set<int> minterms;
     bool used;
     
     Minterm(std::string t, std::set<int> m) : term(t), minterms(m), used(false) {}

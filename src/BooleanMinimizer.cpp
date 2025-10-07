@@ -1,5 +1,4 @@
 #include "BooleanMinimizer.hpp"
-#include <climits>
 
 using namespace std;
 
@@ -197,11 +196,11 @@ void BooleanMinimizer::quineMcCluskey() {
     
     vector<Minterm> allTerms = currentGroup;
     
-    // 反覆合併
+    // 重複合併
     while (true) {
         map<int, vector<Minterm>> grouped;
         
-        // 按照 1 的個數分組
+        // 用1的數量分組
         for (const auto& term : currentGroup) {
             grouped[term.countOnes()].push_back(term);
         }
@@ -209,7 +208,7 @@ void BooleanMinimizer::quineMcCluskey() {
         vector<Minterm> nextGroup;
         set<string> nextGroupSet;
         
-        // 嘗試合併相鄰組
+        // 相鄰的組
         for (auto& pair : grouped) {
             int ones = pair.first;
             if (grouped.find(ones + 1) == grouped.end()) continue;
@@ -236,7 +235,7 @@ void BooleanMinimizer::quineMcCluskey() {
             }
         }
         
-        // 收集未使用的 terms (這些是 prime implicants)
+        // PI (unused)
         for (auto& term : currentGroup) {
             if (!term.used) {
                 bool found = false;
@@ -264,7 +263,7 @@ bool BooleanMinimizer::covers(const Minterm& pi, int minterm) {
 }
 
 vector<Minterm> BooleanMinimizer::petrickMethod() {
-    // 首先找出我們需要覆蓋的所有 minterms (不包括 don't cares)
+    // 需要覆蓋的所有 minterms 不含 don't cares
     set<int> requiredMinterms;
     for (const string& term : minterms) {
         vector<int> expanded = expandTerm(term);
@@ -279,21 +278,21 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
     }
     cout << endl;
     
-    // 找出必要的 prime implicants (essential prime implicants)
+    // 找出EPI
     vector<Minterm> essentialPIs;
     set<int> coveredMinterms;
     
     for (int minterm : requiredMinterms) {
         vector<const Minterm*> coveringPIs;
         
-        // 找到所有能覆蓋此 minterm 的 prime implicants
+        // 找能包住這個 minterm 的 PI
         for (const auto& pi : primeImplicants) {
             if (covers(pi, minterm)) {
                 coveringPIs.push_back(&pi);
             }
         }
         
-        // 如果只有一個 PI 能覆蓋此 minterm，它就是必要的
+        // minterm只被一個PI包住 就是必要的
         if (coveringPIs.size() == 1) {
             const Minterm* essentialPI = coveringPIs[0];
             
@@ -310,7 +309,7 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
                 essentialPIs.push_back(*essentialPI);
                 cout << "Essential PI found: " << essentialPI->term << endl;
                 
-                // 標記所有被此 PI 覆蓋的 minterms
+                // 標記所有被此 PI 包到的 minterms
                 for (int m : essentialPI->minterms) {
                     if (requiredMinterms.find(m) != requiredMinterms.end()) {
                         coveredMinterms.insert(m);
@@ -320,7 +319,7 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
         }
     }
     
-    // 找出剩餘未覆蓋的 minterms
+    // 找出剩餘未被包進的 minterms
     set<int> remainingMinterms;
     for (int m : requiredMinterms) {
         if (coveredMinterms.find(m) == coveredMinterms.end()) {
@@ -334,7 +333,6 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
     }
     cout << endl;
     
-    // 使用改進的貪心演算法選擇剩餘的 PIs
     vector<Minterm> solution = essentialPIs;
     
     while (!remainingMinterms.empty()) {
@@ -344,7 +342,6 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
         
         // 找到最佳的 PI
         for (const auto& pi : primeImplicants) {
-            // 檢查是否已經在解決方案中
             bool alreadySelected = false;
             for (const auto& selectedPI : solution) {
                 if (selectedPI.term == pi.term) {
@@ -363,9 +360,9 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
             
             if (coverage > 0) {
                 int literals = numVars - pi.countDashes();
-                double score = (double)coverage / literals; // 覆蓋數量除以 literal 數量
+                double score = (double)coverage / literals;
                 
-                // 優先選擇覆蓋更多 minterms 的，然後考慮效率，最後考慮字典序
+                // 優先選包更多 minterms 的
                 if (coverage > maxCoverage || 
                     (coverage == maxCoverage && score > bestScore) ||
                     (coverage == maxCoverage && score == bestScore && 
@@ -383,7 +380,7 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
                  << " remaining minterms, " << (numVars - bestPI->countDashes()) 
                  << " literals)" << endl;
             
-            // 移除被覆蓋的 minterms
+            // 移除被包住的 minterms
             for (int m : bestPI->minterms) {
                 remainingMinterms.erase(m);
             }
@@ -414,13 +411,7 @@ void BooleanMinimizer::writePLA(const string& filename, const vector<Minterm>& s
     file << ".ob f" << endl;
     file << ".p " << solution.size() << endl;
     
-    // 簡單按字典序排序
-    vector<Minterm> sortedSolution = solution;
-    sort(sortedSolution.begin(), sortedSolution.end(), [](const Minterm& a, const Minterm& b) {
-        return a.term < b.term;
-    });
-    
-    for (const auto& term : sortedSolution) {
+    for (const auto& term : solution) {
         file << term.term << " 1" << endl;
     }
     
@@ -449,7 +440,6 @@ void BooleanMinimizer::minimize(const string& inputFile, const string& outputFil
     
     quineMcCluskey();
     
-    // 輸出所有找到的 prime implicants 用於調試
     cout << "Found " << primeImplicants.size() << " prime implicants:" << endl;
     for (const auto& pi : primeImplicants) {
         cout << "  " << pi.term << " covers: ";
