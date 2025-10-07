@@ -162,14 +162,14 @@ bool BooleanMinimizer::canCombine(const string& a, const string& b, int& diffPos
 }
 
 void BooleanMinimizer::quineMcCluskey() {
-    set<int> allMinterms;
+    set<int> expandedMinterms;
     map<int, string> mintermMap;
     
     // 展開所有 minterms 和 don't cares
     for (const string& term : minterms) {
         vector<int> expanded = expandTerm(term);
         for (int m : expanded) {
-            allMinterms.insert(m);
+            expandedMinterms.insert(m);
             mintermMap[m] = term;
         }
     }
@@ -177,31 +177,29 @@ void BooleanMinimizer::quineMcCluskey() {
     for (const string& term : dontCares) {
         vector<int> expanded = expandTerm(term);
         for (int m : expanded) {
-            allMinterms.insert(m);
+            expandedMinterms.insert(m);
         }
     }
     
     // 初始化第一組 terms
     vector<Minterm> currentGroup;
-    for (int m : allMinterms) {
-        string binary = "";
+    for (int minterm : expandedMinterms) {
+        string mintermStr = "";
         for (int i = numVars - 1; i >= 0; i--) {
-            binary += ((m >> i) & 1) ? '1' : '0';
+            mintermStr += ((minterm >> i) & 1) ? '1' : '0';
         }
         set<int> s;
-        s.insert(m);
-        currentGroup.push_back(Minterm(binary, s));
+        s.insert(minterm);
+        currentGroup.push_back(Minterm(mintermStr, s));
     }
-    
-    vector<Minterm> allTerms = currentGroup;
     
     // 重複合併
     while (true) {
         map<int, vector<Minterm>> grouped;
         
         // 用1的數量分組
-        for (const auto& term : currentGroup) {
-            grouped[term.countOnes()].push_back(term);
+        for (const auto& minterm : currentGroup) {
+            grouped[minterm.countOnes()].push_back(minterm);
         }
         
         vector<Minterm> nextGroup;
@@ -216,15 +214,15 @@ void BooleanMinimizer::quineMcCluskey() {
                 for (auto& term2 : grouped[ones + 1]) {
                     int diffPos;
                     if (canCombine(term1.term, term2.term, diffPos)) {
-                        string newTerm = term1.term;
-                        newTerm[diffPos] = '-';
+                        string newMintermStr = term1.term;
+                        newMintermStr[diffPos] = '-';
                         
-                        if (nextGroupSet.find(newTerm) == nextGroupSet.end()) {
+                        if (nextGroupSet.find(newMintermStr) == nextGroupSet.end()) {
                             set<int> combinedMinterms = term1.minterms;
                             combinedMinterms.insert(term2.minterms.begin(), 
                                                    term2.minterms.end());
-                            nextGroup.push_back(Minterm(newTerm, combinedMinterms));
-                            nextGroupSet.insert(newTerm);
+                            nextGroup.push_back(Minterm(newMintermStr, combinedMinterms));
+                            nextGroupSet.insert(newMintermStr);
                         }
                         
                         term1.used = true;
@@ -253,7 +251,6 @@ void BooleanMinimizer::quineMcCluskey() {
         if (nextGroup.empty()) break;
         
         currentGroup = nextGroup;
-        allTerms.insert(allTerms.end(), nextGroup.begin(), nextGroup.end());
     }
 }
 
