@@ -19,12 +19,7 @@ file(GLOB SOURCES
 )
 
 # 收集主程序源文件（排除測試文件）
-set(MAIN_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp
-    ${PROJECT_SOURCE_DIR}/src/BooleanMinimizer.cpp
-)
-
-add_executable(main ${MAIN_SOURCES})
+add_executable(main ${SOURCES})
 
 # # 啟用測試
 # enable_testing()
