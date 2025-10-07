@@ -109,19 +109,19 @@ bool BooleanMinimizer::readPLA(const std::string& filename) {
 
 vector<int> BooleanMinimizer::expandTerm(const string& term) {
     vector<int> result;
-    vector<int> dashPositions;
+    vector<int> dashPos;
     
     for (int i = 0; i < term.length(); i++) {
         if (term[i] == '-') {
-            dashPositions.push_back(i);
+            dashPos.push_back(i);
         }
     }
     
-    int numCombinations = 1 << dashPositions.size();
+    int numCombinations = 1 << dashPos.size();
     for (int i = 0; i < numCombinations; i++) {
         string expanded = term;
-        for (int j = 0; j < dashPositions.size(); j++) {
-            expanded[dashPositions[j]] = (i & (1 << j)) ? '1' : '0';
+        for (int j = 0; j < dashPos.size(); j++) {
+            expanded[dashPos[j]] = (i & (1 << j)) ? '1' : '0';
         }
         
         // 檢查展開的字符串是否只包含 0 和 1
@@ -235,7 +235,7 @@ void BooleanMinimizer::quineMcCluskey() {
             }
         }
         
-        // PI (unused)
+        // 找沒打勾的 minterms 變 PI
         for (auto& term : currentGroup) {
             if (!term.used) {
                 bool found = false;
@@ -272,11 +272,6 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
         }
     }
     
-    cout << "Required minterms to cover: ";
-    for (int m : requiredMinterms) {
-        cout << m << " ";
-    }
-    cout << endl;
     
     // 找出EPI
     vector<Minterm> essentialPIs;
@@ -307,7 +302,6 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
             
             if (!alreadyAdded) {
                 essentialPIs.push_back(*essentialPI);
-                cout << "Essential PI found: " << essentialPI->term << endl;
                 
                 // 標記所有被此 PI 包到的 minterms
                 for (int m : essentialPI->minterms) {
@@ -326,12 +320,6 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
             remainingMinterms.insert(m);
         }
     }
-    
-    cout << "Remaining minterms after essential PIs: ";
-    for (int m : remainingMinterms) {
-        cout << m << " ";
-    }
-    cout << endl;
     
     vector<Minterm> solution = essentialPIs;
     
@@ -376,23 +364,15 @@ vector<Minterm> BooleanMinimizer::petrickMethod() {
         
         if (bestPI) {
             solution.push_back(*bestPI);
-            cout << "Selected PI: " << bestPI->term << " (covers " << maxCoverage 
-                 << " remaining minterms, " << (numVars - bestPI->countDashes()) 
-                 << " literals)" << endl;
             
             // 移除被包住的 minterms
             for (int m : bestPI->minterms) {
                 remainingMinterms.erase(m);
             }
         } else {
-            cout << "Warning: Cannot find PI to cover remaining minterms!" << endl;
-            break; // 無法找到更多覆蓋
+            cout << "Cannot find PI to cover remaining minterms!" << endl;
+            break; // 無法找到更多包
         }
-    }
-    
-    cout << "Final solution with " << solution.size() << " terms:" << endl;
-    for (const auto& pi : solution) {
-        cout << "  " << pi.term << endl;
     }
     
     return solution;
@@ -421,43 +401,13 @@ void BooleanMinimizer::writePLA(const string& filename, const vector<Minterm>& s
 
 void BooleanMinimizer::minimize(const string& inputFile, const string& outputFile) {
     if (!readPLA(inputFile)) {      
-        std::cerr << "Failed to read PLA file: " << inputFile << std::endl;
+        std::cout << "Can not read the file: " << inputFile << std::endl;
         return;
     }
     
-    // 輸出原始 minterms 和 don't cares
-    cout << "Original minterms: ";
-    for (const string& m : minterms) {
-        cout << m << " ";
-    }
-    cout << endl;
-    
-    cout << "Don't cares: ";
-    for (const string& dc : dontCares) {
-        cout << dc << " ";
-    }
-    cout << endl;
-    
     quineMcCluskey();
-    
-    cout << "Found " << primeImplicants.size() << " prime implicants:" << endl;
-    for (const auto& pi : primeImplicants) {
-        cout << "  " << pi.term << " covers: ";
-        for (int m : pi.minterms) {
-            cout << m << " ";
-        }
-        cout << endl;
-    }
     
     vector<Minterm> solution = petrickMethod();
     writePLA(outputFile, solution);
-    
-    // 計算 literals
-    int totalLiterals = 0;
-    for (const auto& term : solution) {
-        totalLiterals += (numVars - term.countDashes());
-    }
-    
-    cout << "Total number of terms: " << solution.size() << endl;
-    cout << "Total number of literals: " << totalLiterals << endl;
+    std::cout << "Done! Output written to: " << outputFile << std::endl;
 }
