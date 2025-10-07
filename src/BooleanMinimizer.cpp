@@ -94,7 +94,6 @@ bool BooleanMinimizer::readPLA(const std::string& filename) {
             std::string input_part = trim(line.substr(0, space_pos));
             std::string output_part = trim(line.substr(space_pos + 1));
             
-            // 只保留輸出為1的
             if (output_part == "1"){ 
                 minterms.push_back(input_part);
             } else if (output_part == "-"){ 
